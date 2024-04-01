@@ -39,4 +39,13 @@ export class NotaService {
   async removeAll(userId: number) {
     await this.notaRepository.delete({ user: { id: userId } });
   }
+
+  async markAsRead(userId: number, notaId: number) {
+    const nota = await this.notaRepository.findOneByOrFail({
+      user: { id: userId },
+      id: notaId,
+    });
+    nota.isViewed = true;
+    await this.notaRepository.save(nota);
+  }
 }
