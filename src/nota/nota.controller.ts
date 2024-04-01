@@ -5,6 +5,7 @@ import {
   Delete,
   Request,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import { NotaService } from './nota.service';
 
@@ -29,6 +30,13 @@ export class NotaController {
   @UseGuards(AuthGuard('jwt'))
   async remove(@Request() req: any, @Param('id') id: number) {
     return this.notaService.remove(req.user.id, id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'mark as read notification' })
+  @UseGuards(AuthGuard('jwt'))
+  async markAsRead(@Request() req: any, @Param('id') id: number) {
+    return this.notaService.markAsRead(req.user.id, id);
   }
 
   @Get()

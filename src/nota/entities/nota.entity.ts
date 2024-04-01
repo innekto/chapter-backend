@@ -17,6 +17,9 @@ export class Nota {
   @Column({ type: 'json' })
   data: Record<string, any>;
 
+  @Column({ type: 'boolean', default: false, nullable: false })
+  isViewed: boolean;
+
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
 
