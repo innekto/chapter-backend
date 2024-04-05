@@ -3,7 +3,7 @@ import { FeedController } from './feed.controller';
 import { FeedService } from './feed.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PostEntity } from 'src/post/entities/post.entity';
-import { Book } from 'src/users/entities/book.entity';
+import { Book } from 'src/book/entities/book.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Server } from 'socket.io';
 import { PostService } from 'src/post/post.service';
@@ -15,6 +15,9 @@ import { CommentService } from 'src/comment/comment.service';
 import { UsersService } from 'src/users/users.service';
 import { Session } from 'src/session/entities/session.entity';
 import { Forgot } from 'src/forgot/entities/forgot.entity';
+import { GatewayModule } from 'src/sockets/gateway/gateway.module';
+import { NotaService } from 'src/nota/nota.service';
+import { Nota } from 'src/nota/entities/nota.entity';
 
 @Module({
   imports: [
@@ -26,16 +29,18 @@ import { Forgot } from 'src/forgot/entities/forgot.entity';
       CommentEntity,
       Session,
       Forgot,
+      Nota,
     ]),
+    GatewayModule,
   ],
   providers: [
     FeedService,
-    // FeedGateway,
     Server,
     PostService,
     LikeService,
     CommentService,
     UsersService,
+    NotaService,
   ],
   controllers: [FeedController],
 })

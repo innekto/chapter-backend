@@ -23,9 +23,10 @@ import { AuthProvidersEnum } from 'src/auth/auth-providers.enum';
 import { Exclude, Expose } from 'class-transformer';
 import { PostEntity } from '../../post/entities/post.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Book } from './book.entity';
+import { Book } from '../../book/entities/book.entity';
 import { Like } from '../../like/entity/like.entity';
 import { CommentEntity } from '../../comment/entity/comment.entity';
+import { Nota } from 'src/nota/entities/nota.entity';
 
 @Entity()
 export class User extends EntityHelper {
@@ -155,4 +156,7 @@ export class User extends EntityHelper {
 
   @OneToMany(() => Like, (like) => like.user, { onDelete: 'CASCADE' })
   likes: Like[];
+
+  @OneToMany(() => Nota, (nota) => nota.user, { onDelete: 'CASCADE' })
+  nota: User;
 }

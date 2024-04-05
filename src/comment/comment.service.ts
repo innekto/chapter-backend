@@ -1,12 +1,23 @@
-import { HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CommentEntity } from './entity/comment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
+import { Repository, DeepPartial } from 'typeorm';
+import {
+  CommentToCommentDto,
+  PostCommentDto,
+  UpdateCommentDto,
+} from './dto/comment.dto';
 import { User } from '../users/entities/user.entity';
 import { PostEntity } from '../post/entities/post.entity';
-import { CommentResponse } from './interfaces';
-import { createResponse } from 'src/helpers/response-helpers';
+
+import {
+  transformComments,
+  transformPostInfo,
+} from 'src/post/ helpers/post.transform';
 
 @Injectable()
 export class CommentService {
@@ -20,135 +31,143 @@ export class CommentService {
   ) {}
 
   async create(
-    commentData: CreateCommentDto,
+    commentData: PostCommentDto,
     postId: number,
     userId: number,
-  ): Promise<CommentEntity> {
-    const user = await this.userRepository.findOne({
+  ): Promise<DeepPartial<PostEntity>> {
+    const user = await this.userRepository.findOneOrFail({
       where: { id: userId },
+      relations: ['subscribers'],
     });
-    const post = await this.postRepository.findOne({
+
+    const post = await this.postRepository.findOneOrFail({
       where: { id: postId },
+      relations: ['comments'],
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
     const comment = this.commentRepository.create({
       ...commentData,
       user,
       post,
     });
 
-    return this.commentRepository.save(comment);
+    await this.commentRepository.save(comment);
+
+    const updatedPost = await this.deepGetPostById(postId);
+
+    const transUpdatedPost = transformPostInfo([updatedPost], user);
+
+    return transUpdatedPost[0];
   }
 
   async update(
+    currentUserId: number,
     commentId: number,
     updateData: UpdateCommentDto,
   ): Promise<CommentEntity> {
-    const comment = await this.commentRepository.findOne({
-      where: { id: commentId },
+    const comment = await this.commentRepository.findOneOrFail({
+      where: { id: commentId, user: { id: currentUserId } },
     });
 
-    if (!comment) {
-      throw new NotFoundException(`Comment with ID ${commentId} not found`);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { text, ...rest } = updateData;
+
+    if (Object.keys(rest).length === 2) {
+      const recepient = await this.userRepository.findOne({
+        where: {
+          id: updateData.recipientId,
+          nickName: updateData.recipientNickName,
+        },
+      });
+
+      if (!recepient) {
+        throw new ConflictException("you can't tag a user that doesn't exist");
+      }
     }
 
-    comment.text = updateData.text;
+    Object.assign(comment, updateData);
 
-    await this.commentRepository.save(comment);
-
-    return comment;
+    return await this.commentRepository.save(comment);
   }
 
   async commentToComment(
     userId: number,
     commentId: number,
-    commentData: CreateCommentDto,
-  ): Promise<CommentEntity> {
-    const user = await this.userRepository.findOne({
+    commentData: CommentToCommentDto,
+  ): Promise<DeepPartial<PostEntity>> {
+    const user = await this.userRepository.findOneOrFail({
       where: { id: userId },
+      relations: ['subscribers'],
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const comment = await this.commentRepository.findOne({
+    const comment = await this.commentRepository.findOneOrFail({
       where: { id: commentId },
     });
 
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { text, ...rest } = commentData;
+
+    if (Object.keys(rest).length === 2) {
+      const recepient = await this.userRepository.findOne({
+        where: {
+          id: commentData.recipientId,
+          nickName: commentData.recipientNickName,
+        },
+      });
+
+      if (!recepient) {
+        throw new ConflictException("you can't tag a user that doesn't exist");
+      }
     }
 
     const commentToComment = this.commentRepository.create({
       ...commentData,
-      parentId: comment.parentId,
+      parentId: comment.parentId ? comment.parentId : comment.id,
       postId: comment.postId,
       user,
     });
-    return this.commentRepository.save(commentToComment);
+    await this.commentRepository.save(commentToComment);
+
+    const updatedPost = await this.deepGetPostById(comment.postId);
+
+    const transUpdatedPost = transformPostInfo([updatedPost], user);
+
+    return transUpdatedPost[0];
   }
 
-  // async getRepliesToComment(
-  //   commentId: number,
-  //   commentData: CreateCommentDto,
-  // )  {
-
-  //   const comment = await this.commentRepository.findOne({
-  //     where: { id: commentId },
-  //   });
-
-  //   if (!comment) {
-  //     throw new NotFoundException('Comment not found');
-  //   }
-
-  //   const replies = await this.commentRepository.findOne({
-  //     where: {
-  //         ...commentData,
-  //     parentId: comment?.id,
-  //     },
-  //   });
-  //   return { comment , replies };
-  // }
-
-  async getCommentsByPost(
-    postId: number,
-    page: number,
-    limit: number,
-  ): Promise<CommentResponse> {
+  async getCommentsByPost(postId: number, page: number, limit: number) {
     const post = await this.postRepository.findOne({
       where: { id: postId },
       relations: ['comments'],
     });
 
+    const comments = await this.commentRepository
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.user', 'commentAuthor')
+      .leftJoinAndSelect('comment.likes', 'likes')
+      .where('comment.postId=:postId', { postId })
+      .orderBy('comment.createdAt', 'ASC')
+      .getMany();
+
     if (!post) {
       throw new NotFoundException('Post not found');
     }
 
-    const comments = post.comments;
-    const totalCount = comments.length;
+    const formatedComment = transformComments(comments);
 
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
-    const paginatedComments = comments.slice(startIndex, endIndex);
+    const paginatedComments = formatedComment.slice(startIndex, endIndex);
 
-    return { comments: paginatedComments, totalComments: totalCount };
+    return paginatedComments;
   }
 
-  //15
   async getCommentToComment(commentToCommentId: number) {
     const commentsToComment = await this.commentRepository
       .createQueryBuilder('comment')
       .select('comment.id')
       .where(`comment.parentId=${commentToCommentId}`)
-      .getRawMany();
+      .getMany();
 
     if (!commentsToComment) {
       throw new NotFoundException('Comment-to-comment not found');
@@ -205,21 +224,53 @@ export class CommentService {
     return commentsWithUsers;
   }
 
-  async deleteComment(commentId: number, userId: number): Promise<void> {
-    const comment = await this.commentRepository.findOne({
-      where: {
-        id: commentId,
-      },
+  async deleteComment(
+    commentId: number,
+    userId: number,
+  ): Promise<DeepPartial<PostEntity>> {
+    const user = await this.userRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['subscribers'],
     });
 
-    if (!comment) {
-      throw createResponse(HttpStatus.NOT_FOUND, 'Comment not found.');
-    }
+    const comment = await this.commentRepository.findOneOrFail({
+      where: {
+        id: commentId,
+        user: { id: userId },
+      },
+    });
+    const replies = await this.commentRepository.find({
+      where: { parentId: commentId },
+    });
 
-    if (comment.userId !== userId) {
-      throw createResponse(HttpStatus.FORBIDDEN, 'Insufficient permissions.');
+    for (const replie of replies) {
+      await this.commentRepository.remove(replie);
     }
 
     await this.commentRepository.remove(comment);
+
+    const updatedPost = await this.deepGetPostById(comment.postId);
+    const transUpdatedPost = transformPostInfo([updatedPost], user);
+    return transUpdatedPost[0];
+  }
+
+  async deepGetPostById(postId: number): Promise<PostEntity> {
+    return await this.postRepository
+      .createQueryBuilder('post')
+      .leftJoin('post.author', 'author')
+      .addSelect([
+        'author.id',
+        'author.avatarUrl',
+        'author.firstName',
+        'author.lastName',
+        'author.nickName',
+      ])
+      .leftJoinAndSelect('post.likes', 'like')
+      .leftJoinAndSelect('post.comments', 'comment')
+      .leftJoinAndSelect('comment.user', 'commentAuthor')
+      .leftJoinAndSelect('comment.likes', 'likes')
+      .where('post.id = :postId', { postId })
+      .orderBy('comment.createdAt', 'DESC')
+      .getOneOrFail();
   }
 }

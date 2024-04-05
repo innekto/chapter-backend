@@ -1,11 +1,8 @@
 import {
-  BadRequestException,
   ConflictException,
-  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityCondition } from 'src/utils/types/entity-condition.type';
@@ -14,42 +11,56 @@ import { DeepPartial, IsNull, Not, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from './entities/user.entity';
 import { NullableType } from '../utils/types/nullable.type';
-import { BookInfoDto } from './dto/book-info.dto';
-import { Book } from './entities/book.entity';
-import { CreateBookDto } from './dto/create-book.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import bcrypt from 'bcryptjs';
 import { createResponse } from 'src/helpers/response-helpers';
+import { MyGateway } from 'src/sockets/gateway/gateway';
+
+import { NotaService } from 'src/nota/nota.service';
+import { notaUser } from 'src/nota/helpers/nota.user';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-    @InjectRepository(Book)
-    private bookRepository: Repository<Book>,
+
+    private readonly myGateway: MyGateway,
+    private readonly notaService: NotaService,
   ) {}
 
-  async searchUsers(query: string): Promise<User[]> {
+  async searchUsers(
+    userId: number,
+    query: string,
+  ): Promise<DeepPartial<User[]> | { message: string }> {
+    const currentUser = await this.usersRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['subscribers'],
+    });
+
     const matchingUsers = await this.usersRepository
       .createQueryBuilder('user')
-      .where('user.nickName LIKE :part', { part: `%${query}%` })
       .select([
+        'user.id',
         'user.avatarUrl',
         'user.nickName',
         'user.firstName',
         'user.lastName',
-        'user.id',
       ])
+      .where('user.nickName LIKE :part', { part: `%${query}%` })
+      .andWhere('user.id != :userId', { userId: userId })
       .getMany();
 
     if (matchingUsers.length === 0) {
-      throw new NotFoundException({
-        error: 'Users not found',
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-      });
+      return { message: 'Users not found' };
     }
-    return matchingUsers;
+
+    const usersWithSubscriptionInfo = matchingUsers.map((user) => ({
+      ...user,
+      isSubscribed: currentUser.subscribers.some((sub) => sub.id === user.id),
+    }));
+
+    return usersWithSubscriptionInfo;
   }
 
   create(createProfileDto: CreateUserDto): Promise<User> {
@@ -167,17 +178,14 @@ export class UsersService {
     currentUserId: number,
     targetUserId: number,
   ): Promise<User> {
-    const targetUser = await this.findOne({ id: targetUserId });
-    const currentUser = await this.findOne({ id: currentUserId }, [
-      'subscribers',
-    ]);
+    const targetUser = await this.usersRepository.findOneByOrFail({
+      id: targetUserId,
+    });
 
-    if (!targetUser || !currentUser) {
-      throw new NotFoundException({
-        error: 'User not found',
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-      });
-    }
+    const currentUser = await this.usersRepository.findOneOrFail({
+      where: { id: currentUserId },
+      relations: ['subscribers'],
+    });
 
     if (currentUserId === targetUserId) {
       throw new ConflictException({
@@ -197,6 +205,28 @@ export class UsersService {
       : [...currentUser.subscribers, targetUser];
 
     await currentUser.save();
+
+    const notificationMessage = isSubscribed
+      ? 'Unsubscribed from you'
+      : 'Subscribed to you';
+
+    await this.notaService.create(
+      {
+        message: notificationMessage,
+        user: {
+          ...notaUser(currentUser),
+        },
+      },
+      targetUser,
+    );
+
+    this.myGateway.sendNotificationToUser(
+      {
+        ...notaUser(currentUser),
+      },
+      targetUserId,
+      notificationMessage,
+    );
 
     return currentUser;
   }
@@ -242,17 +272,25 @@ export class UsersService {
     };
   }
 
-  async getGuestsUserInfo(userId: number): Promise<Partial<object>> {
-    const user = await this.findOne({ id: userId }, ['subscribers', 'books']);
+  async getGuestsUserInfo(
+    userId: number,
+    guestId: number,
+  ): Promise<Partial<object>> {
+    const guest = await this.usersRepository.findOneByOrFail({ id: guestId });
+    const user = await this.usersRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['subscribers', 'books'],
+    });
 
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-    }
     const subscribers = await this.usersRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.subscribers', 'subscriber')
       .where('subscriber.id=:userId', { userId })
       .getMany();
+
+    const isSubscribed = subscribers.some(
+      (subscriber) => subscriber.id === guest.id,
+    );
 
     return {
       avatarUrl: user.avatarUrl,
@@ -264,103 +302,8 @@ export class UsersService {
       myFollowersCount: subscribers.length ?? null,
       myFollowingCount: user.subscribers.length ?? null,
       userBooks: user.books,
+      isSubscribed: isSubscribed,
     };
-  }
-
-  async getBookInfoByUser(
-    userId: number,
-    bookId: number,
-  ): Promise<BookInfoDto> {
-    const book = await this.bookRepository.findOne({
-      where: { id: bookId },
-      relations: ['status'],
-    });
-
-    if (!book) {
-      throw new NotFoundException('Book not found for the given user');
-    }
-
-    return {
-      author: book.author,
-      annotation: book.annotation,
-      statusName: book.status.name,
-    };
-  }
-
-  async toggleFavoriteStatus(bookId: number, userId: number): Promise<Book> {
-    const book = await this.bookRepository.findOne({
-      where: { id: bookId },
-      relations: ['user'],
-    });
-
-    if (!book) {
-      throw new NotFoundException('Book not found');
-    }
-
-    if (book.user.id !== userId) {
-      throw new ForbiddenException(
-        'You are not allowed to perform this action.',
-      );
-    }
-
-    const favoriteCount = await this.bookRepository
-      .createQueryBuilder('book')
-      .where('book.userId = :userId', { userId })
-      .andWhere('book.favorite_book_status = :status', { status: true })
-      .getCount();
-
-    if (favoriteCount >= 7 && book.favorite_book_status === false) {
-      throw new BadRequestException('The number of favorites cannot exceed 7');
-    }
-
-    book.favorite_book_status = !book.favorite_book_status;
-
-    const updatedBook: Book = await this.bookRepository.save(book);
-
-    return updatedBook;
-  }
-
-  async getBooksOrderedByFavorite() {
-    const books = await this.bookRepository.find({
-      order: { favorite_book_status: 'DESC' },
-    });
-
-    return books;
-  }
-
-  async addBookToUser(
-    userId: number,
-    createBookDto: CreateBookDto,
-  ): Promise<Book> {
-    const user = await this.usersRepository.findOneOrFail({
-      where: { id: userId },
-      relations: ['books'],
-    });
-
-    const book = this.bookRepository.create(createBookDto);
-    book.user = user;
-
-    await this.usersRepository.save(user);
-    await this.bookRepository.save(book);
-
-    return book;
-  }
-
-  async updateBook(id: number, updateData): Promise<Book> {
-    await this.bookRepository.update(id, updateData);
-
-    const updatedBook = await this.bookRepository.findOne({ where: { id } });
-    if (!updatedBook) {
-      throw new NotFoundException('Book not found');
-    }
-    return updatedBook;
-  }
-
-  async deleteBook(id: number): Promise<void> {
-    const result = await this.bookRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException('Book not found');
-    }
   }
 
   async updatePassword(userId: number, updtePasswordDto: UpdatePasswordDto) {
@@ -440,11 +383,10 @@ export class UsersService {
     page: number,
     limit: number,
   ): Promise<object> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw createResponse(HttpStatus.NOT_FOUND, 'User not found.');
-    }
+    const user = await this.usersRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['subscribers'],
+    });
 
     if (page <= 0 || limit <= 0) {
       throw createResponse(HttpStatus.BAD_REQUEST, 'Invalid page or limit.');
@@ -452,15 +394,30 @@ export class UsersService {
 
     const myFollowers = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
+      .select([
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.nickName',
+        'user.location',
+        'user.avatarUrl',
+      ])
+      .leftJoin('user.subscribers', 'subscriber')
+      .where('subscriber.id=:userId', { userId: user.id })
       .getMany();
 
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
     const paginatedFollowers = myFollowers.slice(startIndex, endIndex);
 
-    return { myFollowers: paginatedFollowers };
+    return {
+      myFollowers: paginatedFollowers.map((fol) => {
+        return {
+          ...fol,
+          isSubscribed: user.subscribers.some((sub) => sub.id === fol.id),
+        };
+      }),
+    };
   }
 
   async deleteUser(id: number): Promise<void> {

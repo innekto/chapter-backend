@@ -1,0 +1,78 @@
+name: build-and-deploy-aws
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_NAME: chapter-dev-api
+  ECS_CLUSTER_NAME: chapter-dev-euc1
+  ECS_SERVICE_NAME: api-backend
+  IMAGE_MAJOR_VERSION: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    name: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: build-and-push
+        id: build-and-push
+        run: |
+          #define-image-version
+          image_version="${{ env.IMAGE_MAJOR_VERSION }}.${{ vars.IMAGE_MINOR_VERSION }}"
+          echo "IMAGE VERSION: $image_version"
+
+          next_image_minor_version="$((${{ vars.IMAGE_MINOR_VERSION }} + 1))"
+          echo "NEXT IMAGE MINOR VERSION: $next_image_minor_version"
+
+          echo "next-image-minor-version=$next_image_minor_version" >> "$GITHUB_OUTPUT"
+
+          aws_repo="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com"
+          repository="$aws_repo/$ECR_NAME"
+
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$aws_repo"
+
+          docker image build -t "${repository}:latest" .
+          docker tag "${repository}:latest" "${repository}:${image_version}"
+
+          docker push "${repository}:latest"
+          docker push "${repository}:${image_version}"
+
+      - name: update-image-version-var
+        uses: action-pack/set-variable@v1
+        with:
+          name: IMAGE_MINOR_VERSION
+          value: ${{ steps.build-and-push.outputs.next-image-minor-version }}
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    needs: build
+    name: deploy
+
+    steps:
+      - name: configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: deploy-to-aws
+        run: |
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER_NAME }} --service ${{ env.ECS_SERVICE_NAME }} --force-new-deployment > /dev/null
+          aws ecs wait services-stable --cluster ${{ env.ECS_CLUSTER_NAME }} --services ${{ env.ECS_SERVICE_NAME }}

@@ -32,6 +32,11 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { LikeModule } from './like/like.module';
 import { CommentModule } from './comment/comment.module';
 import { FeedModule } from './feed/feed.module';
+import { GatewayModule } from './sockets/gateway/gateway.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { NotFoundInterceptor } from './helpers/interceptors/find-one-or-fail';
+import { BookModule } from './book/book.module';
+import { NotaModule } from './nota/nota.module';
 
 @Module({
   imports: [
@@ -95,6 +100,15 @@ import { FeedModule } from './feed/feed.module';
     LikeModule,
     CommentModule,
     FeedModule,
+    GatewayModule,
+    BookModule,
+    NotaModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: NotFoundInterceptor,
+    },
   ],
 })
 export class AppModule {}

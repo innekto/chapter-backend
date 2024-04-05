@@ -8,6 +8,8 @@ import {
   Delete,
   Param,
   Get,
+  Request,
+  Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import {
@@ -22,10 +24,13 @@ import { PostEntity } from './entities/post.entity';
 import { User } from '../users/entities/user.entity';
 import { UpdatePostDto } from './dto/updatePost.dto';
 import { Server } from 'socket.io';
+import { DeepPartial } from 'typeorm';
+
 // import { FeedGateway } from 'src/feed/gateway/feet.gateway';
 
 @ApiBearerAuth()
 @ApiTags('posts')
+@UseGuards(AuthGuard('jwt'))
 @Controller({
   path: 'posts',
   version: '1',
@@ -40,7 +45,6 @@ export class PostController {
   @ApiOperation({ summary: 'Create a post' })
   @ApiResponse({ status: 201, description: 'Created.' })
   @Post('create')
-  @UseGuards(AuthGuard('jwt'))
   async createPost(@Req() req: any, @Body() createPostDto: PostDto) {
     const currentUser: User = req.user;
     return this.postService.create(currentUser, createPostDto);
@@ -53,46 +57,80 @@ export class PostController {
   @ApiResponse({ status: 201, description: 'Updated.' })
   @Patch('update/:id')
   async updatePost(
+    @Req() req: any,
     @Param('id') postId: number,
     @Body() updatePostDto: UpdatePostDto,
   ): Promise<any> {
-    return await this.postService.updatePost(postId, updatePostDto);
-    // .then((caption) => {
-    //   console.log(caption);
-    //   this.Gateway.server.emit('UpdatePost', caption);
-    // });
+    return await this.postService.updatePost(
+      req.user.id,
+      postId,
+      updatePostDto,
+    );
   }
 
   @ApiOperation({ summary: 'delete a post' })
   @ApiResponse({ status: 201, description: 'delete.' })
   @Delete('delete/:id')
-  async deletePost(@Param('id') postId: number): Promise<void> {
-    return await this.postService.deletePost(postId);
+  async deletePost(
+    @Req() req: any,
+    @Param('id') postId: number,
+  ): Promise<void> {
+    return await this.postService.deletePost(req.user.id, postId);
   }
 
   @ApiOperation({ summary: 'Get posts by author' })
   @ApiResponse({ status: 200, description: 'OK', type: [PostEntity] })
   @Get('by-author')
   @UseGuards(AuthGuard('jwt'))
-  async getPostsByAuthor(@Req() req): Promise<PostEntity[]> {
-    const currentUser: User = req.user as User;
+  async getPostsByAuthor(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Request() req: any,
+  ): Promise<DeepPartial<PostEntity[]>> {
+    return await this.postService.getPostsByAuthor(req.user.id, page, limit);
+  }
 
-    return await this.postService.getPostsByAuthor(currentUser);
+  @ApiOperation({ summary: 'Get user`s posts' })
+  @ApiResponse({ status: 200, description: 'OK', type: [PostEntity] })
+  @Get('by-user/:userId')
+  @UseGuards(AuthGuard('jwt'))
+  async getUsersPosts(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Param('userId') userId: number,
+  ): Promise<DeepPartial<PostEntity[]>> {
+    return await this.postService.getUsersPosts(userId, page, limit);
   }
 
   @ApiOperation({ summary: 'get users who liked post' })
-  @Post('users-who-liked-post/:id')
+  @Get('users-who-liked-post/:id')
   @UseGuards(AuthGuard('jwt'))
-  async getUsersWhoLikedPost(@Param('id') postId: number): Promise<object> {
-    return await this.postService.getUsersWhoLikedPost(postId);
+  async getUsersWhoLikedPost(
+    @Request() req: any,
+    @Param('id') postId: number,
+  ): Promise<DeepPartial<User[]>> {
+    return await this.postService.getUsersWhoLikedPost(req.user.id, postId);
   }
 
   @ApiOperation({ summary: 'get posts of user that he liked or comment' })
   @Get('posts')
   @UseGuards(AuthGuard('jwt'))
-  async getLikedAndComentedPosts(@Req() req) {
-    const user: User = req.user as User;
-    const returnValue = this.postService.getLikedAndComentedPosts(user.id);
+  async getLikedAndComentedPosts(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Request() req: any,
+  ) {
+    const returnValue = this.postService.getLikedAndComentedPosts(
+      req.user.id,
+      page,
+      limit,
+    );
     return returnValue;
+  }
+  @ApiOperation({ summary: 'get post' })
+  @Get('post/:id')
+  @UseGuards(AuthGuard('jwt'))
+  async getPost(@Param('id') postId: number, @Request() req: any) {
+    return this.postService.getPostById(postId, req.user.id);
   }
 }

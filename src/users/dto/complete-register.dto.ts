@@ -1,11 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
-import { passwordRegexp } from 'src/helpers/regex/password-regex';
+import { passMessage, passwordRegexp } from 'src/helpers/regex/password-regex';
 import {
   IsEmail,
   IsNotEmpty,
   Matches,
+  MaxLength,
   MinLength,
   Validate,
 } from 'class-validator';
@@ -37,21 +38,20 @@ export class UpdateUserRegisterDto {
 
   @ApiProperty({ example: '@Jojo2323' })
   @IsNotEmpty()
-  @Matches(/^@[A-Za-z0-9]{7,30}$/, { message: 'Incorrect format of nick name' })
+  @Matches(/^@[A-Za-z0-9]{3,30}$/, { message: 'Incorrect format of nick name' })
   nickName: string;
-
   @IsNotEmpty()
   @Matches(passwordRegexp, {
-    message:
-      'Password must contain one capital letter and one number, also password should be only Latin letters',
+    message: passMessage,
   })
   @ApiProperty({ example: 'string' })
-  @MinLength(8)
+  @MaxLength(30)
   password: string;
 
   @IsNotEmpty()
   @ApiProperty()
   @MinLength(8)
+  @MaxLength(30)
   confirmPassword: string;
 
   @ApiProperty({ example: false })

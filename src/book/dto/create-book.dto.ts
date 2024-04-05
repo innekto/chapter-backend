@@ -1,15 +1,30 @@
-import { IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
-export class UpdateBookDto {
+import { ApiProperty } from '@nestjs/swagger';
+import { bookMessage, bookRegExp } from 'src/helpers/regex/book.regexp';
+
+export class CreateBookDto {
   @ApiProperty({ example: 'Harry Potter' })
-  @IsOptional()
   @IsNotEmpty()
-  nameOfBook?: string;
+  @Matches(bookRegExp, {
+    message: bookMessage,
+  })
+  @MaxLength(30)
+  nameOfBook: string;
 
   @ApiProperty({ example: 'J.K. Rowling' })
-  @IsOptional()
   @IsNotEmpty()
+  @IsOptional()
+  @Matches(bookRegExp, {
+    message: bookMessage,
+  })
+  @MaxLength(30)
   author?: string;
 
   @ApiProperty({
@@ -23,13 +38,15 @@ export class UpdateBookDto {
     example:
       'Harry Potter is a series of fantasy novels by J. K. Rowling about a young wizard and his friends at Hogwarts School.',
   })
-  @IsOptional()
   @IsNotEmpty()
+  @IsOptional()
+  @Matches(bookRegExp, {
+    message: bookMessage,
+  })
   annotation?: string;
 
   @ApiProperty({ example: '1' })
-  @IsOptional()
   @IsNotEmpty()
   @IsNumber()
-  book_statusId?: number;
+  book_statusId: number;
 }
