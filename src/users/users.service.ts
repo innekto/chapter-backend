@@ -18,6 +18,7 @@ import { MyGateway } from 'src/sockets/gateway/gateway';
 
 import { NotaService } from 'src/nota/nota.service';
 import { notaUser } from 'src/nota/helpers/nota.user';
+import { createResponseUser } from 'src/helpers/validate-login.user';
 
 @Injectable()
 export class UsersService {
@@ -138,36 +139,18 @@ export class UsersService {
       );
     }
 
-    user.firstName = updateProfileDto.firstName ?? user.firstName;
-    user.lastName = updateProfileDto.lastName ?? user.lastName;
-    user.nickName = updateProfileDto.nickName ?? user.nickName;
-    user.location = updateProfileDto.location ?? user.location;
-    user.avatarUrl = updateProfileDto.avatarUrl ?? user.avatarUrl;
-    user.userStatus = updateProfileDto.userStatus ?? user.userStatus;
+    Object.assign(user, updateProfileDto);
 
     const mySubscribers = await this.usersRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.subscribers', 'subscriber')
       .where('subscriber.id=:userId', { userId })
       .getMany();
-    await this.usersRepository.save(user);
 
-    const updatedUser = {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      location: user.location,
-      userStatus: user.userStatus,
-      role: user.role,
-      status: user.status,
-      myFollowersCount: mySubscribers.length,
-      myFollowingCount: user.subscribers.length,
-      userBooks: user.books,
-    };
-    return updatedUser;
+    const savedUser = await this.usersRepository.save(user);
+
+    const responeUser = createResponseUser(savedUser, mySubscribers, false);
+    return responeUser;
   }
 
   async softDelete(id: User['id']): Promise<void> {
@@ -255,21 +238,7 @@ export class UsersService {
       .where('subscriber.id=:userId', { userId })
       .getMany();
 
-    return {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      location: user.location,
-      userStatus: user.userStatus,
-      role: user.role,
-      status: user.status,
-      myFollowersCount: mySubscribers?.length || null,
-      myFollowingCount: user.subscribers?.length || null,
-      userBooks: user.books,
-    };
+    return createResponseUser(user, mySubscribers, false);
   }
 
   async getGuestsUserInfo(
@@ -312,20 +281,15 @@ export class UsersService {
     if (!user) {
       throw createResponse(HttpStatus.NOT_FOUND, 'User not found.');
     }
+    const { oldPassword, newPassword, repeatNewPassword } = updtePasswordDto;
 
-    const isValidPassword = await bcrypt.compare(
-      updtePasswordDto.oldPassword,
-      user.password,
-    );
+    const isValidPassword = await bcrypt.compare(oldPassword, user.password);
 
     if (!isValidPassword) {
       throw createResponse(HttpStatus.BAD_REQUEST, 'Incorrect old password!');
     }
 
-    const samePassword = await bcrypt.compare(
-      updtePasswordDto.newPassword,
-      user.password,
-    );
+    const samePassword = await bcrypt.compare(newPassword, user.password);
 
     if (samePassword) {
       throw createResponse(
@@ -334,14 +298,14 @@ export class UsersService {
       );
     }
 
-    if (updtePasswordDto.newPassword !== updtePasswordDto.repeatNewPassword) {
+    if (newPassword !== repeatNewPassword) {
       throw createResponse(
         HttpStatus.BAD_REQUEST,
         'Both passwords must match!',
       );
     }
 
-    user.password = updtePasswordDto.newPassword;
+    user.password = newPassword;
     await this.usersRepository.save(user);
 
     // Успішна відповідь

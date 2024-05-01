@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -42,6 +43,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Forgot } from 'src/forgot/entities/forgot.entity';
 import { Repository } from 'typeorm';
 import { checkHashValidity } from 'src/utils/validators/check.hash.validity';
+import { createResponseUser } from 'src/helpers/validate-login.user';
 
 @Injectable()
 export class AuthService {
@@ -67,14 +69,10 @@ export class AuthService {
     });
 
     if (deletedUser) {
-      throw new HttpException(
-        {
-          status: HttpStatus.FORBIDDEN,
-          message: deletedAccountMessage,
-          deletedUserDate: new Date(deletedUser.deletedAt).toISOString(),
-        },
-        HttpStatus.FORBIDDEN,
-      );
+      throw new ForbiddenException({
+        message: deletedAccountMessage,
+        deletedUserDate: new Date(deletedUser.deletedAt).toISOString(),
+      });
     }
 
     const user = await this.usersService.findOne(
@@ -101,15 +99,11 @@ export class AuthService {
           user.role.id,
         ))
     ) {
-      throw new HttpException(
-        {
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-          errors: {
-            email: 'notFound',
-          },
+      throw new UnprocessableEntityException({
+        errors: {
+          email: 'notFound',
         },
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
+      });
     }
 
     if (user.status?.id === 2) {
@@ -134,15 +128,11 @@ export class AuthService {
     );
 
     if (!isValidPassword) {
-      throw new HttpException(
-        {
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-          errors: {
-            password: 'incorrectPassword',
-          },
+      throw new UnprocessableEntityException({
+        errors: {
+          password: 'incorrectPassword',
         },
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
+      });
     }
 
     const session = await this.sessionService.create({
@@ -154,25 +144,8 @@ export class AuthService {
       role: user.role,
       sessionId: session.id,
     });
-    const resUser = {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      location: user.location,
-      userStatus: user.userStatus,
-      role: user.role,
-      status: user.status,
-      myFollowersCount: subscribers?.length || null,
-      myFollowingCount: user.subscribers?.length || null,
-      userBooks: user.books,
-      socialId: user.socialId,
-      IsAccessCookie: user.IsAccessCookie,
-      photo: user.photo,
-      provider: user.provider,
-    };
+
+    const resUser = createResponseUser(user, subscribers);
 
     return {
       refreshToken,
@@ -300,25 +273,8 @@ export class AuthService {
       .where('subscriber.id=:userId', { userId: user.id })
       .getMany();
 
-    const resUser = {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      location: user.location,
-      userStatus: user.userStatus,
-      role: user.role,
-      status: user.status,
-      provider: user.provider,
-      socialId: user.socialId,
-      IsAccessCookie: user.IsAccessCookie,
-      photo: user.photo,
-      userBooks: user.books,
-      myFollowersCount: subscribers?.length || null,
-      myFollowingCount: user.subscribers?.length || null,
-    };
+    const resUser = createResponseUser(user, subscribers);
+
     return {
       refreshToken,
       token: jwtToken,
@@ -349,24 +305,20 @@ export class AuthService {
     });
     if (existingUser) {
       if (existingUser.status?.name === 'Inactive') {
-        throw new ConflictException({
-          error: 'This email has already been registered, but is not confirmed',
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-        });
+        throw new ConflictException(
+          'This email has already been registered, but is not confirmed',
+        );
       } else if (
         existingUser.status?.name === 'Active' &&
         existingUser.password === null
       ) {
-        throw new ConflictException({
-          error:
-            'This email has already been registered, but registration is not completed',
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-        });
+        throw new ConflictException(
+          'This email has already been registered, but registration is not completed',
+        );
       } else {
-        throw new ConflictException({
-          error: 'This email is already registered with an active account',
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-        });
+        throw new ConflictException(
+          'This email is already registered with an active account',
+        );
       }
     }
 
@@ -396,10 +348,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException({
-        error: `User with this nickname already exists.`,
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-      });
+      throw new ConflictException('User with this nickname already exists.');
     }
   }
 
@@ -512,21 +461,10 @@ export class AuthService {
     });
 
     if (userNickName) {
-      throw new ConflictException({
-        error: `User with this nickname already exists.`,
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-      });
+      throw new ConflictException('User with this nickname already exists.');
     }
 
-    user.nickName = completeDto.nickName;
-
-    user.firstName = completeDto.firstName;
-
-    user.lastName = completeDto.lastName;
-
-    user.password = completeDto.password;
-
-    user.IsAccessCookie = completeDto.IsAccessCookie;
+    Object.assign(user, completeDto);
 
     await user.save();
   }
@@ -541,28 +479,16 @@ export class AuthService {
     if (existingUser?.status?.name === 'Inactive') {
       throw new ConflictException({
         error: 'Email status is Inactive',
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
       });
     } else if (
       existingUser?.status?.name === 'Active' &&
       existingUser.nickName === null
     ) {
-      throw new ConflictException({
-        error: 'You have not completed the registration',
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-      });
+      throw new ConflictException('You have not completed the registration');
     }
 
     if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.UNPROCESSABLE_ENTITY,
-          errors: {
-            email: 'emailNotExists',
-          },
-        },
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
+      throw new UnprocessableEntityException('Email not exists');
     }
 
     const countForgot = await this.forgotRepository
@@ -571,9 +497,8 @@ export class AuthService {
       .getCount();
 
     if (countForgot >= 3) {
-      throw new HttpException(
+      throw new BadRequestException(
         'You can request a password reset maximum 3 times per day.',
-        HttpStatus.BAD_REQUEST,
       );
     }
 
