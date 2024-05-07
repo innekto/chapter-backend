@@ -87,10 +87,7 @@ export class BookService {
     const book = this.bookRepository.create(createBookDto);
     book.user = user;
 
-    await this.usersRepository.save(user);
-    await this.bookRepository.save(book);
-
-    return book;
+    return await this.bookRepository.save(book);
   }
 
   async updateBook(

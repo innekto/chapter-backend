@@ -243,9 +243,11 @@ export class CommentService {
       where: { parentId: commentId },
     });
 
-    for (const replie of replies) {
-      await this.commentRepository.remove(replie);
-    }
+    await Promise.all(
+      replies.map(async (reply) => {
+        await this.commentRepository.remove(reply);
+      }),
+    );
 
     await this.commentRepository.remove(comment);
 

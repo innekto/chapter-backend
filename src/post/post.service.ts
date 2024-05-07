@@ -13,6 +13,7 @@ import { CommentService } from 'src/comment/comment.service';
 import { notaUser } from 'src/nota/helpers/nota.user';
 import { NotaService } from 'src/nota/nota.service';
 import { CommentEntity } from 'src/comment/entity/comment.entity';
+import { mapUserToResponse } from './ helpers/users-who-liked-post.response';
 
 @Injectable()
 export class PostService {
@@ -74,15 +75,11 @@ export class PostService {
     postId: number,
     updatePostDto: UpdatePostDto,
   ): Promise<void> {
-    const post = await this.postRepository.findOne({
+    const post = await this.postRepository.findOneOrFail({
       where: { id: postId, author: { id: userId } },
     });
 
-    if (!post) {
-      throw new NotFoundException(`Post not found`);
-    }
-
-    await this.postRepository.update(postId, updatePostDto);
+    await this.postRepository.update(post.id, updatePostDto);
   }
 
   async deletePost(userId: number, postId: number): Promise<void> {
@@ -160,16 +157,9 @@ export class PostService {
       .andWhere('user.id != :userId', { userId: userId })
       .getMany();
 
-    const response = allUsers.map((user) => ({
-      userId: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      userStatus: user.userStatus,
-      location: user.location,
-      avatarUrl: user.avatarUrl,
-      isSubscribed: currentUser.subscribers.some((sub) => sub.id === user.id),
-    }));
+    const response = allUsers.map((user) =>
+      mapUserToResponse(user, currentUser),
+    );
     return response;
   }
 
