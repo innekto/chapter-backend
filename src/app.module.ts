@@ -14,7 +14,6 @@ import appleConfig from './config/apple.config';
 import path from 'path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthFacebookModule } from './auth-facebook/auth-facebook.module';
 import { AuthGoogleModule } from './auth-google/auth-google.module';
 import { I18nModule } from 'nestjs-i18n/dist/i18n.module';
 import { HeaderResolver } from 'nestjs-i18n';
@@ -88,7 +87,6 @@ import { NotaModule } from './nota/nota.module';
     UsersModule,
     FilesModule,
     AuthModule,
-    AuthFacebookModule,
     AuthGoogleModule,
     ForgotModule,
     SessionModule,
