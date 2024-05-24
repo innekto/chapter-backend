@@ -224,7 +224,10 @@ export class CommentService {
     return commentsWithUsers;
   }
 
-  async deleteComment(commentId: number, userId: number) {
+  async deleteComment(
+    commentId: number,
+    userId: number,
+  ): Promise<DeepPartial<PostEntity>> {
     const user = await this.userRepository.findOneOrFail({
       where: { id: userId },
       relations: ['subscribers'],

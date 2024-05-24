@@ -172,7 +172,10 @@ export class CommentController {
   @UseGuards(AuthGuard('jwt'))
   @ApiResponse({ status: 201, description: 'delete.' })
   @Delete('delete/:id')
-  async deleteComment(@Param('id') commentId: number, @Request() req) {
+  async deleteComment(
+    @Param('id') commentId: number,
+    @Request() req,
+  ): Promise<DeepPartial<PostEntity>> {
     return await this.commentService.deleteComment(commentId, req.user.id);
   }
 
@@ -183,7 +186,7 @@ export class CommentController {
   async deleteCommentOnYourOwnPost(
     @Param('id') commentId: number,
     @Request() req,
-  ) {
+  ): Promise<DeepPartial<PostEntity>> {
     return await this.commentService.deleteCommentOnYourOwnPost(
       commentId,
       req.user.id,
