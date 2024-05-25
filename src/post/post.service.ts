@@ -173,6 +173,21 @@ export class PostService {
       relations: ['subscribers'],
     });
 
+    const likedAndCommentedPosts = await this.postRepository
+      .createQueryBuilder('post')
+      .leftJoin('post.likes', 'like', 'like.userId = :userId', {
+        userId: user.id,
+      })
+      .leftJoin('post.comments', 'comment', 'comment.userId = :userId', {
+        userId: user.id,
+      })
+      .where('like.userId = :userId OR comment.userId = :userId')
+      .setParameter('userId', user.id)
+      .select('DISTINCT post.id')
+      .getRawMany();
+
+    const ids = likedAndCommentedPosts.map((post) => post.id);
+
     const postInfo: PostEntity[] = await this.postRepository
       .createQueryBuilder('post')
       .leftJoin('post.author', 'author')
@@ -187,9 +202,7 @@ export class PostService {
       .leftJoinAndSelect('post.comments', 'comment')
       .leftJoinAndSelect('comment.user', 'commentAuthor')
       .leftJoinAndSelect('comment.likes', 'likes')
-      .where('like.userId = :userId OR comment.userId = :userId', {
-        userId: user.id,
-      })
+      .where('post.id IN (:...ids)', { ids })
       .andWhere('like.comment IS NULL')
       .orderBy('post.createdAt', 'DESC')
       .getMany();

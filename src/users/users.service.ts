@@ -222,7 +222,7 @@ export class UsersService {
       .getRawOne();
 
     const { followersCount, ...user } = data;
-    console.log('user :>> ', user);
+
     return createResponseUser(user, +followersCount, false);
   }
 
