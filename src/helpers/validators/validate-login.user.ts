@@ -1,26 +1,26 @@
-import { User } from 'src/users/entities/user.entity';
-
 export const createResponseUser = (
-  user: User,
-  subscribers: User[],
+  user: any,
+  subscribers: number,
   isUpadate: boolean = true,
 ) => {
   return {
-    id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    nickName: user.nickName,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    location: user.location,
-    userStatus: user.userStatus,
-    role: user.role,
-    status: user.status,
-    ...(isUpadate && { provider: user.provider }),
-    ...(isUpadate && { socialId: user.socialId }),
-    ...(isUpadate && { IsAccessCookie: user.IsAccessCookie }),
-    userBooks: user.books,
-    myFollowersCount: subscribers?.length || null,
-    myFollowingCount: user.subscribers?.length || null,
+    id: user.user_id,
+    firstName: user.user_firstName || user.firstName,
+    lastName: user.user_lastName || user.lastName,
+    nickName: user.user_nickName || user.nickName,
+    email: user.user_email || user.email,
+    avatarUrl: user.user_avatarUrl || user.avatarUrl,
+    location: user.user_location || user.location,
+    userStatus: user.user_userStatus || user.userStatus,
+    role: user.user_role || user.Role,
+    status: user.user_status || user.user_status,
+    ...(isUpadate && { provider: user.user_provider || user.provider }),
+    ...(isUpadate && { socialId: user.user_socialId || user.cosialId }),
+    ...(isUpadate && {
+      IsAccessCookie: user.user_IsAccessCookie || user.IsAccessCookie,
+    }),
+    userBooks: user.user_books || user.books,
+    myFollowersCount: subscribers || null,
+    myFollowingCount: +user.followingCount || user.subscribers.length || null,
   };
 };

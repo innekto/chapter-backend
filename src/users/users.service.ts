@@ -1,7 +1,6 @@
 import {
   ConflictException,
   ForbiddenException,
-  HttpException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -133,15 +132,20 @@ export class UsersService {
 
     Object.assign(user, updateProfileDto);
 
-    const mySubscribers = await this.usersRepository
+    const subscribersCount = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
     const savedUser = await this.usersRepository.save(user);
 
-    const responeUser = createResponseUser(savedUser, mySubscribers, false);
+    const responeUser = createResponseUser(
+      savedUser,
+      +subscribersCount.subscribersCount,
+      false,
+    );
     return responeUser;
   }
 
@@ -206,31 +210,20 @@ export class UsersService {
     return currentUser;
   }
 
-  async me(userId: number): Promise<Partial<object>> {
-    const user = await this.findOne(
-      {
-        id: userId,
-      },
-      ['posts', 'subscribers', 'books'],
-    );
-
-    if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'User not found.',
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const mySubscribers = await this.usersRepository
+  async me(userId: number): Promise<Partial<User>> {
+    const data = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriberToUser')
+      .leftJoin('subscriberToUser.subscribers', 'follower')
+      .addSelect('COUNT(DISTINCT subscriberToUser.id)', 'followingCount')
+      .addSelect('COUNT(DISTINCT follower.id)', 'followersCount')
+      .where('user.id = :userId', { userId })
+      .groupBy('user.id')
+      .getRawOne();
 
-    return createResponseUser(user, mySubscribers, false);
+    const { followersCount, ...user } = data;
+    console.log('user :>> ', user);
+    return createResponseUser(user, +followersCount, false);
   }
 
   async getGuestsUserInfo(
@@ -245,12 +238,13 @@ export class UsersService {
 
     const subscribers = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('user.id')
       .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .getRawMany();
 
     const isSubscribed = subscribers.some(
-      (subscriber) => subscriber.id === guest.id,
+      (subscriber) => subscriber.user_id === guest.id,
     );
 
     return {

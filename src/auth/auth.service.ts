@@ -116,11 +116,12 @@ export class AuthService {
       );
     }
 
-    const subscribers = await this.userRepository
+    const subscribersCount = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId: user.id })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
     const isValidPassword = await bcrypt.compare(
       loginDto.password,
@@ -145,7 +146,10 @@ export class AuthService {
       sessionId: session.id,
     });
 
-    const resUser = createResponseUser(user, subscribers);
+    const resUser = createResponseUser(
+      user,
+      +subscribersCount.subscribersCount,
+    );
 
     return {
       refreshToken,
@@ -267,13 +271,17 @@ export class AuthService {
       sessionId: session.id,
     });
 
-    const subscribers = await this.userRepository
+    const subscribersCount = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId: user.id })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
-    const resUser = createResponseUser(user, subscribers);
+    const resUser = createResponseUser(
+      user,
+      +subscribersCount.subscribersCount,
+    );
 
     return {
       refreshToken,
