@@ -1,8 +1,10 @@
 import {
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityCondition } from 'src/utils/types/entity-condition.type';
@@ -18,7 +20,7 @@ import { MyGateway } from 'src/sockets/gateway/gateway';
 
 import { NotaService } from 'src/nota/nota.service';
 import { notaUser } from 'src/nota/helpers/nota.user';
-import { createResponseUser } from 'src/helpers/validate-login.user';
+import { createResponseUser } from 'src/helpers';
 
 @Injectable()
 export class UsersService {
@@ -120,22 +122,12 @@ export class UsersService {
     );
 
     if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'User not found.',
-        },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new NotFoundException('User not found.');
     }
 
     if (userId !== user.id) {
-      throw new HttpException(
-        {
-          status: HttpStatus.FORBIDDEN,
-          error: 'You do not have permission to update this user.',
-        },
-        HttpStatus.FORBIDDEN,
+      throw new ForbiddenException(
+        'You do not have permission to update this user.',
       );
     }
 

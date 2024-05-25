@@ -7,7 +7,7 @@ import {
 } from 'class-validator';
 
 import { ApiProperty } from '@nestjs/swagger';
-import { bookMessage, bookRegExp } from 'src/helpers/regex/book.regexp';
+import { bookRegExp, bookMessage } from 'src/helpers';
 
 export class CreateBookDto {
   @ApiProperty({ example: 'Harry Potter' })

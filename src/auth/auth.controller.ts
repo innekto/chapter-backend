@@ -13,19 +13,22 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
+
 import { AuthForgotPasswordDto } from './dto/auth-forgot-password.dto';
-import { AuthConfirmEmailDto } from './dto/auth-confirm-email.dto';
-import { AuthResetPasswordDto } from './dto/auth-reset-password.dto';
 
 import { AuthGuard } from '@nestjs/passport';
 import { LoginResponseType } from './types/login-response.type';
 import { User } from '../users/entities/user.entity';
 
-import { AuthRegisterLoginDto } from './dto/auth-register-login.dto';
 import { UpdateUserRegisterDto } from 'src/users/dto/complete-register.dto';
 
 import { Response, Request as req } from 'express';
+import {
+  AuthConfirmEmailDto,
+  AuthEmailLoginDto,
+  AuthRegisterDto,
+  AuthResetPasswordDto,
+} from './dto';
 
 @ApiTags('Auth')
 @Controller({
@@ -76,7 +79,7 @@ export class AuthController {
 
   @Post('email/register')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async register(@Body() createUserDto: AuthRegisterLoginDto): Promise<void> {
+  async register(@Body() createUserDto: AuthRegisterDto): Promise<void> {
     return this.service.register(createUserDto);
   }
 
@@ -88,9 +91,7 @@ export class AuthController {
 
   @Patch('refresh-unique-token')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async refreshToken(
-    @Body() createUserDto: AuthRegisterLoginDto,
-  ): Promise<void> {
+  async refreshToken(@Body() createUserDto: AuthRegisterDto): Promise<void> {
     await this.service.resendConfirmationCode(createUserDto.email);
   }
 
@@ -182,7 +183,7 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('restoring-user')
-  async restoringUser(@Body() restoringDto: AuthRegisterLoginDto) {
+  async restoringUser(@Body() restoringDto: AuthRegisterDto) {
     return await this.service.restoringUser(restoringDto);
   }
 
