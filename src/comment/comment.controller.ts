@@ -168,28 +168,19 @@ export class CommentController {
     return await this.commentService.getCommentToComment(commentToCommentId);
   }
 
-  @ApiOperation({ summary: 'delete your own comment' })
+  @ApiOperation({ summary: 'delete  comment' })
   @UseGuards(AuthGuard('jwt'))
   @ApiResponse({ status: 201, description: 'delete.' })
   @Delete('delete/:id')
   async deleteComment(
     @Param('id') commentId: number,
     @Request() req,
+    @Query('isOwnPost') isOwnPost: boolean,
   ): Promise<DeepPartial<PostEntity>> {
-    return await this.commentService.deleteComment(commentId, req.user.id);
-  }
-
-  @ApiOperation({ summary: 'delete a comment on your own post' })
-  @UseGuards(AuthGuard('jwt'))
-  @ApiResponse({ status: 201, description: 'delete.' })
-  @Delete('remove/on-your-own-post:id')
-  async deleteCommentOnYourOwnPost(
-    @Param('id') commentId: number,
-    @Request() req,
-  ): Promise<DeepPartial<PostEntity>> {
-    return await this.commentService.deleteCommentOnYourOwnPost(
+    return await this.commentService.deleteComment(
       commentId,
       req.user.id,
+      isOwnPost,
     );
   }
 }

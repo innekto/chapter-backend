@@ -227,35 +227,20 @@ export class CommentService {
   async deleteComment(
     commentId: number,
     userId: number,
+    isOwnPost: boolean = false,
   ): Promise<DeepPartial<PostEntity>> {
     const user = await this.userRepository.findOneOrFail({
       where: { id: userId },
       relations: ['subscribers'],
     });
-    const result = await this.commentRepository
-      .createQueryBuilder('comment')
-      .leftJoin('comment.post', 'post')
-      .leftJoin('post.author', 'author')
-      .select([
-        'comment.id AS "commentID"',
-        'comment.userId AS "userId"',
-        'post.id AS "postId"',
-        'author.id as "postAuthorId"',
-      ])
-      .where('comment.id = :commentId', { commentId })
-      .orWhere('comment.parentId=:commentId', { commentId })
-      .getRawMany();
 
+    const result = await this.getCommentsWithDetails(commentId, isOwnPost);
+    console.log('result :>> ', result);
     const commentToDelete = result.find(
       (comment) => comment.commentID === commentId,
     );
+    this.checkDeletionPermission(commentToDelete, userId, isOwnPost);
 
-    if (!commentToDelete) {
-      throw new NotFoundException('Comment not found');
-    }
-    if (commentToDelete.userId !== userId) {
-      throw new ConflictException('You can only delete your own comments');
-    }
     const replyIdsToDelete = result
       .filter((comment) => comment.commentID !== commentId)
       .map((comment) => comment.commentID);
@@ -271,16 +256,8 @@ export class CommentService {
     return transUpdatedPost[0];
   }
 
-  async deleteCommentOnYourOwnPost(
-    commentId: number,
-    userId: number,
-  ): Promise<DeepPartial<PostEntity>> {
-    const user = await this.userRepository.findOneOrFail({
-      where: { id: userId },
-      relations: ['subscribers'],
-    });
-
-    const result = await this.commentRepository
+  private async getCommentsWithDetails(commentId: number, isOwnPost: boolean) {
+    const queryBuilder = this.commentRepository
       .createQueryBuilder('comment')
       .leftJoin('comment.post', 'post')
       .leftJoin('post.author', 'author')
@@ -288,36 +265,34 @@ export class CommentService {
         'comment.id AS "commentID"',
         'post.id AS "postId"',
         'author.id as "postAuthorId"',
-      ])
+      ]);
+
+    if (!isOwnPost) {
+      queryBuilder.addSelect('comment.userId AS "userId"');
+    }
+
+    return await queryBuilder
       .where('comment.id = :commentId', { commentId })
       .orWhere('comment.parentId=:commentId', { commentId })
       .getRawMany();
+  }
 
-    const commentToDelete = result.find(
-      (comment) => comment.commentID === commentId,
-    );
-
-    if (!commentToDelete) {
-      throw new NotFoundException('Comment not found');
+  private checkDeletionPermission(
+    commentToDelete: any,
+    userId: number,
+    isOwnPost: boolean,
+  ) {
+    if (isOwnPost) {
+      if (commentToDelete.postAuthorId !== userId) {
+        throw new ConflictException(
+          'You can only delete comments on your own posts',
+        );
+      }
+    } else {
+      if (commentToDelete.userId !== userId) {
+        throw new ConflictException('You can only delete your own comments');
+      }
     }
-    if (commentToDelete.postAuthorId !== userId) {
-      throw new ConflictException(
-        'You can only delete comments on your own posts',
-      );
-    }
-    const replyIdsToDelete = result
-      .filter((comment) => comment.commentID !== commentId)
-      .map((comment) => comment.commentID);
-
-    if (replyIdsToDelete.length) {
-      await this.commentRepository.delete(replyIdsToDelete);
-    }
-
-    await this.commentRepository.delete(commentId);
-
-    const updatedPost = await this.deepGetPostById(commentToDelete.postId);
-    const transUpdatedPost = transformPostInfo([updatedPost], user);
-    return transUpdatedPost[0];
   }
 
   async deepGetPostById(postId: number): Promise<PostEntity> {
