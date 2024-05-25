@@ -19,7 +19,6 @@ export const createResponseUser = (
     ...(isUpadate && { provider: user.provider }),
     ...(isUpadate && { socialId: user.socialId }),
     ...(isUpadate && { IsAccessCookie: user.IsAccessCookie }),
-    ...(isUpadate && { photo: user.photo }),
     userBooks: user.books,
     myFollowersCount: subscribers?.length || null,
     myFollowingCount: user.subscribers?.length || null,
