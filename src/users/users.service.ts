@@ -211,19 +211,24 @@ export class UsersService {
   }
 
   async me(userId: number): Promise<Partial<User>> {
-    const data = await this.usersRepository
-      .createQueryBuilder('user')
+    const user = await this.usersRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['books'],
+    });
+
+    const followingAndllowersCount = await this.usersRepository
+      .createQueryBuilder()
+      .select('COUNT(DISTINCT subscriberToUser.id)', 'followingCount')
+      .addSelect('COUNT(DISTINCT follower.id)', 'followersCount')
+      .from('user', 'user')
       .leftJoin('user.subscribers', 'subscriberToUser')
       .leftJoin('subscriberToUser.subscribers', 'follower')
-      .addSelect('COUNT(DISTINCT subscriberToUser.id)', 'followingCount')
-      .addSelect('COUNT(DISTINCT follower.id)', 'followersCount')
       .where('user.id = :userId', { userId })
-      .groupBy('user.id')
       .getRawOne();
 
-    const { followersCount, ...user } = data;
+    const { followersCount, followingCount } = followingAndllowersCount;
 
-    return createResponseUser(user, +followersCount, false);
+    return createResponseUser(user, +followersCount, false, +followingCount);
   }
 
   async getGuestsUserInfo(
