@@ -216,7 +216,7 @@ export class UsersService {
       relations: ['books'],
     });
 
-    const followingAndllowersCount = await this.usersRepository
+    const followingAndFollowersCount = await this.usersRepository
       .createQueryBuilder()
       .select('COUNT(DISTINCT subscriberToUser.id)', 'followingCount')
       .addSelect('COUNT(DISTINCT follower.id)', 'followersCount')
@@ -226,7 +226,7 @@ export class UsersService {
       .where('user.id = :userId', { userId })
       .getRawOne();
 
-    const { followersCount, followingCount } = followingAndllowersCount;
+    const { followersCount, followingCount } = followingAndFollowersCount;
 
     return createResponseUser(user, +followersCount, false, +followingCount);
   }
