@@ -35,15 +35,15 @@ import { SessionService } from 'src/session/session.service';
 import { JwtRefreshPayloadType } from './strategies/types/jwt-refresh-payload.type';
 import { Session } from 'src/session/entities/session.entity';
 
-import { AuthRegisterLoginDto } from './dto/auth-register-login.dto';
+import { AuthRegisterDto } from './dto/auth-register.dto';
 import { UpdateUserRegisterDto } from 'src/users/dto/complete-register.dto';
 import { createResponse } from 'src/helpers/response-helpers';
 import { deletedAccountMessage } from 'src/helpers/messages/messages';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Forgot } from 'src/forgot/entities/forgot.entity';
 import { Repository } from 'typeorm';
-import { checkHashValidity } from 'src/utils/validators/check.hash.validity';
-import { createResponseUser } from 'src/helpers/validate-login.user';
+import { checkHashValidity } from 'src/helpers/validators/check.hash.validity';
+import { createResponseUser } from 'src/helpers';
 
 @Injectable()
 export class AuthService {
@@ -116,11 +116,12 @@ export class AuthService {
       );
     }
 
-    const subscribers = await this.userRepository
+    const subscribersCount = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId: user.id })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
     const isValidPassword = await bcrypt.compare(
       loginDto.password,
@@ -145,7 +146,10 @@ export class AuthService {
       sessionId: session.id,
     });
 
-    const resUser = createResponseUser(user, subscribers);
+    const resUser = createResponseUser(
+      user,
+      +subscribersCount.subscribersCount,
+    );
 
     return {
       refreshToken,
@@ -267,13 +271,17 @@ export class AuthService {
       sessionId: session.id,
     });
 
-    const subscribers = await this.userRepository
+    const subscribersCount = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId: user.id })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
-    const resUser = createResponseUser(user, subscribers);
+    const resUser = createResponseUser(
+      user,
+      +subscribersCount.subscribersCount,
+    );
 
     return {
       refreshToken,
@@ -283,7 +291,7 @@ export class AuthService {
     } as unknown as LoginResponseType;
   }
 
-  async register(dto: AuthRegisterLoginDto): Promise<void> {
+  async register(dto: AuthRegisterDto): Promise<void> {
     const hash = crypto
       .createHash('sha256')
       .update(randomStringGenerator())
@@ -666,7 +674,7 @@ export class AuthService {
     };
   }
 
-  async restoringUser(data: AuthRegisterLoginDto) {
+  async restoringUser(data: AuthRegisterDto) {
     const deletedUser = await this.usersService.findDeletedUserByCondition({
       email: data.email,
     });

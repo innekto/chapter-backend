@@ -54,7 +54,7 @@ export class CommentService {
     await this.commentRepository.save(comment);
 
     const updatedPost = await this.deepGetPostById(postId);
-
+    console.log('updatedPost :>> ', updatedPost);
     const transUpdatedPost = transformPostInfo([updatedPost], user);
 
     return transUpdatedPost[0];
@@ -235,7 +235,7 @@ export class CommentService {
     });
 
     const result = await this.getCommentsWithDetails(commentId, isOwnPost);
-    console.log('result :>> ', result);
+
     const commentToDelete = result.find(
       (comment) => comment.commentID === commentId,
     );

@@ -2,15 +2,16 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, Matches } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { lowerCaseTransformer } from 'src/utils/transformers/lower-case.transformer';
+import { emailRegexp } from 'src/helpers';
 
-export class AuthRegisterLoginDto {
+export class AuthRegisterDto {
   @ApiProperty({ example: 'test1@example.com' })
   @Transform(lowerCaseTransformer)
   // @Validate(IsNotExist, ['User'], {
   //   message: 'emailAlreadyExists',
   // })
   @IsEmail()
-  @Matches(/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, {
+  @Matches(emailRegexp, {
     message: 'Incorrect email',
   })
   @IsNotEmpty()

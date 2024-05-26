@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
-import { passMessage, passwordRegexp } from 'src/helpers/regex/password-regex';
 import {
   IsEmail,
   IsNotEmpty,
@@ -10,8 +9,9 @@ import {
   MinLength,
   Validate,
 } from 'class-validator';
+import { passMessage, passwordRegexp } from 'src/helpers';
 import { lowerCaseTransformer } from 'src/utils/transformers/lower-case.transformer';
-import { IsValidName } from 'src/utils/validators/double-names-validator';
+import { IsValidName } from 'src/helpers/validators/double-names-validator';
 
 export class UpdateUserRegisterDto {
   @ApiProperty()

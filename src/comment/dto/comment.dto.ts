@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, Length, Matches, ValidateIf } from 'class-validator';
-import { commentRegexp } from 'src/helpers/regex/comment.regexp';
+import { commentRegexp } from 'src/helpers';
 
 export class PostCommentDto {
   @ApiProperty({

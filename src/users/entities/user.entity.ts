@@ -16,7 +16,7 @@ import {
 } from 'typeorm';
 import { Role } from '../../roles/entities/role.entity';
 import { Status } from '../../statuses/entities/status.entity';
-import { FileEntity } from '../../files/entities/file.entity';
+
 import bcrypt from 'bcryptjs';
 import { EntityHelper } from 'src/utils/entity-helper';
 import { AuthProvidersEnum } from 'src/auth/auth-providers.enum';
@@ -89,11 +89,6 @@ export class User extends EntityHelper {
 
   @Column({ type: String, nullable: true })
   avatarUrl: string | null;
-
-  @ManyToOne(() => FileEntity, {
-    eager: true,
-  })
-  photo?: FileEntity | null;
 
   @ManyToOne(() => Role, {
     eager: true,

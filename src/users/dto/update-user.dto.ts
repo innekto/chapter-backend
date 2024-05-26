@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { IsNotEmpty, IsOptional, Matches, Validate } from 'class-validator';
-import { IsValidName } from 'src/utils/validators/double-names-validator';
+import { IsValidName } from 'src/helpers/validators/double-names-validator';
 
 export class UpdateUserDto {
   @ApiProperty({ example: 'John' })

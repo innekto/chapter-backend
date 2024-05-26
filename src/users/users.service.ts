@@ -1,8 +1,9 @@
 import {
   ConflictException,
-  HttpException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityCondition } from 'src/utils/types/entity-condition.type';
@@ -18,7 +19,7 @@ import { MyGateway } from 'src/sockets/gateway/gateway';
 
 import { NotaService } from 'src/nota/nota.service';
 import { notaUser } from 'src/nota/helpers/nota.user';
-import { createResponseUser } from 'src/helpers/validate-login.user';
+import { createResponseUser } from 'src/helpers';
 
 @Injectable()
 export class UsersService {
@@ -120,36 +121,31 @@ export class UsersService {
     );
 
     if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'User not found.',
-        },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new NotFoundException('User not found.');
     }
 
     if (userId !== user.id) {
-      throw new HttpException(
-        {
-          status: HttpStatus.FORBIDDEN,
-          error: 'You do not have permission to update this user.',
-        },
-        HttpStatus.FORBIDDEN,
+      throw new ForbiddenException(
+        'You do not have permission to update this user.',
       );
     }
 
     Object.assign(user, updateProfileDto);
 
-    const mySubscribers = await this.usersRepository
+    const subscribersCount = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
     const savedUser = await this.usersRepository.save(user);
 
-    const responeUser = createResponseUser(savedUser, mySubscribers, false);
+    const responeUser = createResponseUser(
+      savedUser,
+      +subscribersCount.subscribersCount,
+      false,
+    );
     return responeUser;
   }
 
@@ -214,31 +210,25 @@ export class UsersService {
     return currentUser;
   }
 
-  async me(userId: number): Promise<Partial<object>> {
-    const user = await this.findOne(
-      {
-        id: userId,
-      },
-      ['posts', 'subscribers', 'books'],
-    );
+  async me(userId: number): Promise<Partial<User>> {
+    const user = await this.usersRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['books'],
+    });
 
-    if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'User not found.',
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
+    const followingAndllowersCount = await this.usersRepository
+      .createQueryBuilder()
+      .select('COUNT(DISTINCT subscriberToUser.id)', 'followingCount')
+      .addSelect('COUNT(DISTINCT follower.id)', 'followersCount')
+      .from('user', 'user')
+      .leftJoin('user.subscribers', 'subscriberToUser')
+      .leftJoin('subscriberToUser.subscribers', 'follower')
+      .where('user.id = :userId', { userId })
+      .getRawOne();
 
-    const mySubscribers = await this.usersRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
-      .getMany();
+    const { followersCount, followingCount } = followingAndllowersCount;
 
-    return createResponseUser(user, mySubscribers, false);
+    return createResponseUser(user, +followersCount, false, +followingCount);
   }
 
   async getGuestsUserInfo(
@@ -253,12 +243,13 @@ export class UsersService {
 
     const subscribers = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('user.id')
       .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .getRawMany();
 
     const isSubscribed = subscribers.some(
-      (subscriber) => subscriber.id === guest.id,
+      (subscriber) => subscriber.user_id === guest.id,
     );
 
     return {
