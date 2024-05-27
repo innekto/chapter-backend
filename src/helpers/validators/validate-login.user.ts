@@ -5,7 +5,7 @@ export const createResponseUser = (
   following?: number,
 ) => {
   return {
-    id: user.user_id,
+    id: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
     nickName: user.nickName,
