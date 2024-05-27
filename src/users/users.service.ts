@@ -217,15 +217,23 @@ export class UsersService {
     });
 
     const followingAndFollowersCount = await this.usersRepository
-      .createQueryBuilder()
-      .select('COUNT(DISTINCT subscriberToUser.id)', 'followingCount')
-      .addSelect('COUNT(DISTINCT follower.id)', 'followersCount')
-      .from('user', 'user')
-      .leftJoin('user.subscribers', 'subscriberToUser')
-      .leftJoin('subscriberToUser.subscribers', 'follower')
+      .createQueryBuilder('user')
+      .leftJoin(
+        'User2user(friends)',
+        'following',
+        'following.userId_1 = user.id',
+      )
+      .leftJoin(
+        'User2user(friends)',
+        'followers',
+        'followers.userId_2 = user.id',
+      )
+      .select('COUNT(DISTINCT following.userId_2)', 'followingCount')
+      .addSelect('COUNT(DISTINCT followers.userId_1)', 'followersCount')
       .where('user.id = :userId', { userId })
       .getRawOne();
 
+    console.log('followingAndFollowersCount :>> ', followingAndFollowersCount);
     const { followersCount, followingCount } = followingAndFollowersCount;
 
     return createResponseUser(user, +followersCount, false, +followingCount);
