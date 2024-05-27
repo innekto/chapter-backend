@@ -18,14 +18,14 @@ export const createResponseUser = (
     ...(isUpadate && { provider: user.provider }),
     ...(isUpadate && { socialId: user.cosialId }),
     ...(isUpadate && {
-      IsAccessCookie: user.user_IsAccessCookie || user.IsAccessCookie,
+      IsAccessCookie: user.IsAccessCookie,
     }),
     userBooks: user.books,
     myFollowersCount: subscribers || null,
     myFollowingCount:
       following !== undefined && following !== null
         ? following
-        : user.subscribers.length > 0
+        : user.subscribers?.length > 0
         ? user.subscribers.length
         : null,
   };
