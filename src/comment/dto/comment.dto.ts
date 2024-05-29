@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, Length, Matches, ValidateIf } from 'class-validator';
-import { commentRegexp } from 'src/helpers';
+import { unifiedRegexp } from 'src/helpers';
 
 export class PostCommentDto {
   @ApiProperty({
@@ -9,7 +9,7 @@ export class PostCommentDto {
     minLength: 1,
     maxLength: 500,
   })
-  @Matches(commentRegexp, {
+  @Matches(unifiedRegexp, {
     message: 'incorrect format',
   })
   @IsNotEmpty({ message: 'Comment text should not be empty' })
@@ -26,7 +26,7 @@ export class CommentToCommentDto extends PartialType(PostCommentDto) {
     minLength: 1,
     maxLength: 500,
   })
-  @Matches(commentRegexp, {
+  @Matches(unifiedRegexp, {
     message: 'incorrect format',
   })
   @IsNotEmpty({ message: 'Comment text should not be empty' })

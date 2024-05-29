@@ -1,8 +1,5 @@
-export const bookRegExp =
-  /^[a-zA-Zа-яА-ЯіІїЇєЄґҐ\d\s!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~\p{Emoji}]+$/u;
-
-export const commentRegexp =
-  /^[a-zA-Zа-яА-ЯіІїЇєЄґҐ\s!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~\d\p{Emoji}]+$/u;
+export const unifiedRegexp =
+  /^[a-zA-Zа-яА-ЯіІїЇєЄґҐ\d\s!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~\u00a9\u00ae\u2000-\u3300\uD83C-\uDBFF\uDC00-\uDFFF]+$/u;
 
 export const namesValidator =
   /^[A-Za-zА-Яа-яҐґЄєЖжИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщьЮюЯя']+$/;

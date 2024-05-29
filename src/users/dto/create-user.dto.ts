@@ -14,6 +14,7 @@ import { IsNotExist } from 'src/helpers/validators/is-not-exists.validator';
 
 import { IsExist } from 'src/helpers/validators/is-exists.validator';
 import { lowerCaseTransformer } from 'src/utils/transformers/lower-case.transformer';
+import { emailRegexp } from 'src/helpers';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'test1@example.com' })
@@ -23,7 +24,7 @@ export class CreateUserDto {
     message: 'emailAlreadyExists',
   })
   @IsEmail()
-  @Matches(/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, {
+  @Matches(emailRegexp, {
     message: 'Incorrect email',
   })
   email?: string | null;
