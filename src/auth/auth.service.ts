@@ -38,7 +38,7 @@ import { Session } from 'src/session/entities/session.entity';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { UpdateUserRegisterDto } from 'src/users/dto/complete-register.dto';
 import { createResponse } from 'src/helpers/response-helpers';
-import { deletedAccountMessage } from 'src/helpers/messages/messages';
+import { deletedAccountMessage, loginErrorMessage } from 'src/helpers';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Forgot } from 'src/forgot/entities/forgot.entity';
 import { Repository } from 'typeorm';
@@ -99,11 +99,7 @@ export class AuthService {
           user.role.id,
         ))
     ) {
-      throw new UnprocessableEntityException({
-        errors: {
-          email: 'notFound',
-        },
-      });
+      throw new UnauthorizedException({ message: loginErrorMessage });
     }
 
     if (user.status?.id === 2) {
@@ -129,11 +125,7 @@ export class AuthService {
     );
 
     if (!isValidPassword) {
-      throw new UnprocessableEntityException({
-        errors: {
-          password: 'incorrectPassword',
-        },
-      });
+      throw new UnauthorizedException({ message: loginErrorMessage });
     }
 
     const session = await this.sessionService.create({
