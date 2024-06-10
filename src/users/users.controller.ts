@@ -133,7 +133,10 @@ export class UsersController {
 
   @Patch('me')
   @HttpCode(HttpStatus.OK)
-  update(@Request() request, @Body() updateProfileDto: UpdateUserDto) {
+  update(
+    @Request() request,
+    @Body() updateProfileDto: UpdateUserDto,
+  ): Promise<Partial<User>> {
     return this.usersService.update(request.user.id, updateProfileDto);
   }
 

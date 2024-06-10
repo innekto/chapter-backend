@@ -1,8 +1,9 @@
 import {
   ConflictException,
-  HttpException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityCondition } from 'src/utils/types/entity-condition.type';
@@ -18,6 +19,7 @@ import { MyGateway } from 'src/sockets/gateway/gateway';
 
 import { NotaService } from 'src/nota/nota.service';
 import { notaUser } from 'src/nota/helpers/nota.user';
+import { createResponseUser } from 'src/helpers';
 
 @Injectable()
 export class UsersService {
@@ -119,55 +121,32 @@ export class UsersService {
     );
 
     if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'User not found.',
-        },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new NotFoundException('User not found.');
     }
 
     if (userId !== user.id) {
-      throw new HttpException(
-        {
-          status: HttpStatus.FORBIDDEN,
-          error: 'You do not have permission to update this user.',
-        },
-        HttpStatus.FORBIDDEN,
+      throw new ForbiddenException(
+        'You do not have permission to update this user.',
       );
     }
 
-    user.firstName = updateProfileDto.firstName ?? user.firstName;
-    user.lastName = updateProfileDto.lastName ?? user.lastName;
-    user.nickName = updateProfileDto.nickName ?? user.nickName;
-    user.location = updateProfileDto.location ?? user.location;
-    user.avatarUrl = updateProfileDto.avatarUrl ?? user.avatarUrl;
-    user.userStatus = updateProfileDto.userStatus ?? user.userStatus;
+    Object.assign(user, updateProfileDto);
 
-    const mySubscribers = await this.usersRepository
+    const subscribersCount = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
-      .getMany();
-    await this.usersRepository.save(user);
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('COUNT(subscriber.id)', 'subscribersCount')
+      .where('subscriber.id = :userId', { userId: user.id })
+      .getRawOne();
 
-    const updatedUser = {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      location: user.location,
-      userStatus: user.userStatus,
-      role: user.role,
-      status: user.status,
-      myFollowersCount: mySubscribers.length,
-      myFollowingCount: user.subscribers.length,
-      userBooks: user.books,
-    };
-    return updatedUser;
+    const savedUser = await this.usersRepository.save(user);
+
+    const responeUser = createResponseUser(
+      savedUser,
+      +subscribersCount.subscribersCount,
+      false,
+    );
+    return responeUser;
   }
 
   async softDelete(id: User['id']): Promise<void> {
@@ -231,45 +210,33 @@ export class UsersService {
     return currentUser;
   }
 
-  async me(userId: number): Promise<Partial<object>> {
-    const user = await this.findOne(
-      {
-        id: userId,
-      },
-      ['posts', 'subscribers', 'books'],
-    );
+  async me(userId: number): Promise<Partial<User>> {
+    const user = await this.usersRepository.findOneOrFail({
+      where: { id: userId },
+      relations: ['books'],
+    });
 
-    if (!user) {
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'User not found.',
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const mySubscribers = await this.usersRepository
+    const followingAndFollowersCount = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
-      .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .leftJoin(
+        'User2user(friends)',
+        'following',
+        'following.userId_1 = user.id',
+      )
+      .leftJoin(
+        'User2user(friends)',
+        'followers',
+        'followers.userId_2 = user.id',
+      )
+      .select('COUNT(DISTINCT following.userId_2)', 'followingCount')
+      .addSelect('COUNT(DISTINCT followers.userId_1)', 'followersCount')
+      .where('user.id = :userId', { userId })
+      .getRawOne();
 
-    return {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      nickName: user.nickName,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      location: user.location,
-      userStatus: user.userStatus,
-      role: user.role,
-      status: user.status,
-      myFollowersCount: mySubscribers?.length || null,
-      myFollowingCount: user.subscribers?.length || null,
-      userBooks: user.books,
-    };
+    console.log('followingAndFollowersCount :>> ', followingAndFollowersCount);
+    const { followersCount, followingCount } = followingAndFollowersCount;
+
+    return createResponseUser(user, +followersCount, false, +followingCount);
   }
 
   async getGuestsUserInfo(
@@ -284,12 +251,13 @@ export class UsersService {
 
     const subscribers = await this.usersRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.subscribers', 'subscriber')
+      .leftJoin('user.subscribers', 'subscriber')
+      .select('user.id')
       .where('subscriber.id=:userId', { userId })
-      .getMany();
+      .getRawMany();
 
     const isSubscribed = subscribers.some(
-      (subscriber) => subscriber.id === guest.id,
+      (subscriber) => subscriber.user_id === guest.id,
     );
 
     return {
@@ -312,20 +280,15 @@ export class UsersService {
     if (!user) {
       throw createResponse(HttpStatus.NOT_FOUND, 'User not found.');
     }
+    const { oldPassword, newPassword, repeatNewPassword } = updtePasswordDto;
 
-    const isValidPassword = await bcrypt.compare(
-      updtePasswordDto.oldPassword,
-      user.password,
-    );
+    const isValidPassword = await bcrypt.compare(oldPassword, user.password);
 
     if (!isValidPassword) {
       throw createResponse(HttpStatus.BAD_REQUEST, 'Incorrect old password!');
     }
 
-    const samePassword = await bcrypt.compare(
-      updtePasswordDto.newPassword,
-      user.password,
-    );
+    const samePassword = await bcrypt.compare(newPassword, user.password);
 
     if (samePassword) {
       throw createResponse(
@@ -334,14 +297,14 @@ export class UsersService {
       );
     }
 
-    if (updtePasswordDto.newPassword !== updtePasswordDto.repeatNewPassword) {
+    if (newPassword !== repeatNewPassword) {
       throw createResponse(
         HttpStatus.BAD_REQUEST,
         'Both passwords must match!',
       );
     }
 
-    user.password = updtePasswordDto.newPassword;
+    user.password = newPassword;
     await this.usersRepository.save(user);
 
     // Успішна відповідь

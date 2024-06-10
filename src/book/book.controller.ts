@@ -11,8 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { BookService } from './book.service';
-import { CreateBookDto } from './dto/create-book.dto';
-import { UpdateBookDto } from './dto/update-book.dto';
+
 import { User } from 'src/users/entities/user.entity';
 import {
   ApiBearerAuth,
@@ -21,8 +20,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Book } from './entities/book.entity';
-import { BookInfoDto } from './dto/book-info.dto';
+
 import { AuthGuard } from '@nestjs/passport';
+import { BookInfoDto, CreateBookDto, UpdateBookDto } from './dto';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))

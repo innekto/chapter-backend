@@ -7,21 +7,21 @@ import {
 } from 'class-validator';
 
 import { ApiProperty } from '@nestjs/swagger';
-import { bookMessage, bookRegExp } from 'src/helpers/regex/book.regexp';
+import { unifiedRegexp, bookMessage } from 'src/helpers';
 
 export class CreateBookDto {
   @ApiProperty({ example: 'Harry Potter' })
   @IsNotEmpty()
-  @Matches(bookRegExp, {
+  @Matches(unifiedRegexp, {
     message: bookMessage,
   })
-  @MaxLength(30)
+  @MaxLength(60)
   nameOfBook: string;
 
   @ApiProperty({ example: 'J.K. Rowling' })
   @IsNotEmpty()
   @IsOptional()
-  @Matches(bookRegExp, {
+  @Matches(unifiedRegexp, {
     message: bookMessage,
   })
   @MaxLength(30)
@@ -40,7 +40,7 @@ export class CreateBookDto {
   })
   @IsNotEmpty()
   @IsOptional()
-  @Matches(bookRegExp, {
+  @Matches(unifiedRegexp, {
     message: bookMessage,
   })
   annotation?: string;

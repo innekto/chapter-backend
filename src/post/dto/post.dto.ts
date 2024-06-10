@@ -6,6 +6,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { unifiedRegexp } from 'src/helpers';
 
 export class PostDto {
   @IsString()
@@ -18,18 +19,14 @@ export class PostDto {
   @IsOptional()
   @IsNotEmpty()
   @ApiProperty()
-  @Matches(
-    /^[a-zA-Zа-яА-ЯіІїЇєЄґҐ\s!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~\d\p{Emoji}]+$/u,
-  )
+  @Matches(unifiedRegexp)
   readonly caption?: string;
 
   @IsString()
   @IsOptional()
   @IsNotEmpty()
   @ApiProperty()
-  @Matches(
-    /^[a-zA-Zа-яА-ЯіІїЇєЄґҐ\s!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~\d\p{Emoji}]+$/u,
-  )
+  @Matches(unifiedRegexp)
   readonly title?: string;
 
   @ValidateIf((value) => !value.imageUrl && !value.caption && !value.title)

@@ -1,9 +1,9 @@
-import { namesValidator } from 'src/helpers/regex/names-regexp';
 import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
 import { Injectable } from '@nestjs/common';
+import { namesValidator } from 'src/helpers';
 
 @Injectable()
 @ValidatorConstraint({ name: 'IsValidName', async: true })
