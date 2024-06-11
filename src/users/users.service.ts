@@ -233,7 +233,6 @@ export class UsersService {
       .where('user.id = :userId', { userId })
       .getRawOne();
 
-    console.log('followingAndFollowersCount :>> ', followingAndFollowersCount);
     const { followersCount, followingCount } = followingAndFollowersCount;
 
     return createResponseUser(user, +followersCount, false, +followingCount);
