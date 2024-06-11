@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DeepPartial, Not } from 'typeorm';
+import { Repository, DeepPartial } from 'typeorm';
 import { PostEntity } from './entities/post.entity';
 import { PostDto } from './dto/post.dto';
 import { User } from '../users/entities/user.entity';
@@ -14,6 +14,7 @@ import { notaUser } from 'src/nota/helpers/nota.user';
 import { NotaService } from 'src/nota/nota.service';
 import { CommentEntity } from 'src/comment/entity/comment.entity';
 import { mapUserToResponse } from './ helpers/users-who-liked-post.response';
+import { limitedParallel } from './limitedParallel';
 
 @Injectable()
 export class PostService {
@@ -43,21 +44,28 @@ export class PostService {
 
     const notificationMessage = 'New post';
 
-    const users = await this.usersRepository.find({
-      where: { id: Not(author.id) },
-    });
+    const users = await this.usersRepository
+      .createQueryBuilder('user')
+      .select('user.id AS id')
+      .where('user.id != :authorId', { authorId: author.id })
+      .orderBy('user.id')
+      .getRawMany();
+
     const newPost = await this.postRepository.save(post);
 
-    await Promise.all(
-      users.map((user) =>
-        this.notaService.create(
-          {
-            message: notificationMessage,
-            ...notaUser(post.author, newPost.id),
-          },
-          user,
-        ),
-      ),
+    const createNotaForUser = async (user) => {
+      return this.notaService.create(
+        {
+          message: notificationMessage,
+          ...notaUser(post.author, newPost.id),
+        },
+        user,
+      );
+    };
+    const concurrencyLimit = 5;
+    await limitedParallel(
+      users.map((user) => () => createNotaForUser(user)),
+      concurrencyLimit,
     );
 
     this.myGateway.sendNotificationToAllUsers(
