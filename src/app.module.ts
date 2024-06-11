@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import databaseConfig from './config/database.config';
@@ -35,6 +35,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { NotFoundInterceptor } from './helpers/interceptors/find-one-or-fail';
 import { BookModule } from './book/book.module';
 import { NotaModule } from './nota/nota.module';
+import { AppLoggerMiddleware } from './middlewares/logger.middleware';
 
 @Module({
   imports: [
@@ -107,4 +108,8 @@ import { NotaModule } from './nota/nota.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AppLoggerMiddleware).forRoutes('*');
+  }
+}

@@ -54,7 +54,6 @@ export class CommentService {
     await this.commentRepository.save(comment);
 
     const updatedPost = await this.deepGetPostById(postId);
-    console.log('updatedPost :>> ', updatedPost);
     const transUpdatedPost = transformPostInfo([updatedPost], user);
 
     return transUpdatedPost[0];
