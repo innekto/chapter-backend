@@ -1,7 +1,17 @@
-import Promise from 'bluebird';
+import async from 'async';
 
 export const limitedParallel = async (tasks: any, limit: number) => {
-  return await Promise.map(tasks, (task: any) => task(), {
-    concurrency: limit,
+  await new Promise<void>((resolve, reject) => {
+    async.eachLimit(
+      tasks,
+      limit,
+      async (task: any) => {
+        await task();
+      },
+      (err) => {
+        if (err) reject(err);
+        else resolve();
+      },
+    );
   });
 };
