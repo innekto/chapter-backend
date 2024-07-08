@@ -47,14 +47,18 @@ export class PostService {
     const users = await this.usersRepository
       .createQueryBuilder('user')
       .select('user.id AS id')
+      .leftJoin('user.subscribers', 'subscribers')
       .where('user.id != :authorId', { authorId: author.id })
+      .andWhere('subscribers.id = :userId', { userId: user.id })
       .orderBy('user.id')
       .getRawMany();
+
+    console.log('users :>> ', users);
 
     const newPost = await this.postRepository.save(post);
 
     const createNotaForUser = async (user) => {
-      return this.notaService.create(
+      return await this.notaService.create(
         {
           message: notificationMessage,
           ...notaUser(post.author, newPost.id),
@@ -62,9 +66,12 @@ export class PostService {
         user,
       );
     };
+
     const concurrencyLimit = 5;
     await limitedParallel(
-      users.map((user) => () => createNotaForUser(user)),
+      users.map((user) => () => {
+        return createNotaForUser(user);
+      }),
       concurrencyLimit,
     );
 
