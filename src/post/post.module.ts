@@ -17,7 +17,7 @@ import { Nota } from 'src/nota/entities/nota.entity';
     TypeOrmModule.forFeature([PostEntity, User, Like, CommentEntity, Nota]),
     GatewayModule,
   ],
-  providers: [PostService, Server, CommentService,NotaService],
+  providers: [PostService, Server, CommentService, NotaService],
   controllers: [PostController],
 })
 export class PostModule {}
