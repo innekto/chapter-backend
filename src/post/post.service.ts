@@ -53,32 +53,11 @@ export class PostService {
       .orderBy('user.id')
       .getRawMany();
 
-    console.log('users :>> ', users);
-
     const newPost = await this.postRepository.save(post);
-
-    const createNotaForUser = async (user) => {
-      return await this.notaService.create(
-        {
-          message: notificationMessage,
-          ...notaUser(post.author, newPost.id),
-        },
-        user,
-      );
-    };
-
-    const concurrencyLimit = 5;
-    await limitedParallel(
-      users.map((user) => () => {
-        return createNotaForUser(user);
-      }),
-      concurrencyLimit,
-    );
-
-    this.myGateway.sendNotificationToAllUsers(
-      {
-        ...notaUser(post.author, newPost.id),
-      },
+    await this.createAndSendNotes(
+      newPost.id,
+      newPost.author,
+      users,
       notificationMessage,
     );
 
@@ -253,5 +232,37 @@ export class PostService {
       .addOrderBy('comment.createdAt', 'DESC')
       .getMany();
     return postsInfo;
+  }
+
+  private async createAndSendNotes(
+    postId: number,
+    postAuthor: User,
+    users: User[],
+    message: string,
+  ) {
+    const createNotaForUser = async (user: User) => {
+      return await this.notaService.create(
+        {
+          message: message,
+          ...notaUser(postAuthor, postId),
+        },
+        user,
+      );
+    };
+
+    const concurrencyLimit = 5;
+    await limitedParallel(
+      users.map((user) => () => {
+        return createNotaForUser(user);
+      }),
+      concurrencyLimit,
+    );
+
+    this.myGateway.sendNotificationToAllUsers(
+      {
+        ...notaUser(postAuthor, postId),
+      },
+      message,
+    );
   }
 }
