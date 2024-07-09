@@ -182,24 +182,7 @@ export class PostService {
 
     const ids = likedAndCommentedPosts.map((post) => post.id);
 
-    const postInfo: PostEntity[] = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.author', 'author')
-      .addSelect([
-        'author.id',
-        'author.avatarUrl',
-        'author.firstName',
-        'author.lastName',
-        'author.nickName',
-      ])
-      .leftJoinAndSelect('post.likes', 'like')
-      .leftJoinAndSelect('post.comments', 'comment')
-      .leftJoinAndSelect('comment.user', 'commentAuthor')
-      .leftJoinAndSelect('comment.likes', 'likes')
-      .where('post.id IN (:...ids)', { ids })
-      .andWhere('like.comment IS NULL')
-      .orderBy('post.createdAt', 'DESC')
-      .getMany();
+    const postInfo: PostEntity[] = await this.getPostInfo(ids, undefined);
 
     const transformedResponse = transformPostInfo(postInfo, user);
 
@@ -212,25 +195,7 @@ export class PostService {
   }
 
   private async getPostsByUserId(userId: number) {
-    const postsInfo: PostEntity[] = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.author', 'author')
-      .addSelect([
-        'author.id',
-        'author.avatarUrl',
-        'author.firstName',
-        'author.lastName',
-        'author.nickName',
-      ])
-      .leftJoinAndSelect('post.likes', 'like')
-      .leftJoinAndSelect('post.comments', 'comment')
-      .leftJoinAndSelect('comment.user', 'commentAuthor')
-      .leftJoinAndSelect('comment.likes', 'likes')
-      .where('author.id = :userId', { userId })
-      .andWhere('like.comment IS NULL')
-      .orderBy('post.createdAt', 'DESC')
-      .addOrderBy('comment.createdAt', 'DESC')
-      .getMany();
+    const postsInfo: PostEntity[] = await this.getPostInfo(undefined, userId);
     return postsInfo;
   }
 
@@ -264,5 +229,38 @@ export class PostService {
       },
       message,
     );
+  }
+
+  private async getPostInfo(
+    ids?: number[],
+    userId?: number,
+  ): Promise<PostEntity[]> {
+    const queryBuilder = this.postRepository
+      .createQueryBuilder('post')
+      .leftJoin('post.author', 'author')
+      .addSelect([
+        'author.id',
+        'author.avatarUrl',
+        'author.firstName',
+        'author.lastName',
+        'author.nickName',
+      ])
+      .leftJoinAndSelect('post.likes', 'like')
+      .leftJoinAndSelect('post.comments', 'comment')
+      .leftJoinAndSelect('comment.user', 'commentAuthor')
+      .leftJoinAndSelect('comment.likes', 'likes')
+      .where('like.comment IS NULL')
+      .orderBy('post.createdAt', 'DESC');
+
+    if (ids) {
+      queryBuilder.andWhere('post.id IN (:...ids)', { ids });
+    }
+
+    if (userId) {
+      queryBuilder.andWhere('author.id = :userId', { userId });
+      queryBuilder.addOrderBy('comment.createdAt', 'DESC');
+    }
+
+    return queryBuilder.getMany();
   }
 }
