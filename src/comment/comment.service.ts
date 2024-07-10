@@ -185,8 +185,8 @@ export class CommentService {
         'comment.text as text',
         'comment.postId as post_id',
         'comment.userId as user_id',
-        'comment.createdAt as created_at',
-        'comment.updatedAt as updated_at',
+        'comment.createdAt as "createdAt"',
+        'comment.updatedAt as "updatedAt"',
         'like.userId as like_user_id',
       ])
       .where(`comment.postId=${postId}`)
@@ -213,8 +213,8 @@ export class CommentService {
           text: comment.text,
           postId: comment.post_id,
           user,
-          createdAt: comment.created_at,
-          updatedAt: comment.updated_at,
+          createdAt: comment.createdAt,
+          updatedAt: comment.updatedAt,
           likeIds,
         };
       }),
