@@ -20,7 +20,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://localhost:5173',
-      'https://dev.chapter-web.com',
+      'https://web-chapter.netlify.app/',
       'https://chapter-web.com/',
     ],
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
