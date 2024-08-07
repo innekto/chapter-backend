@@ -46,7 +46,10 @@ export class Book extends EntityHelper {
   imagePath: string;
 
   @Exclude()
-  @ManyToOne(() => User, (user) => user.books, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.books, {
+    onDelete: 'CASCADE',
+    cascade: true,
+  })
   user: User;
 
   @Exclude()

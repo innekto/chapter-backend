@@ -166,7 +166,7 @@ export class PostService {
       where: { id: currentUserId },
       relations: ['subscribers'],
     });
-
+    console.log('user :>> ', user);
     const likedAndCommentedPosts = await this.postRepository
       .createQueryBuilder('post')
       .leftJoin('post.likes', 'like', 'like.userId = :userId', {
@@ -180,6 +180,9 @@ export class PostService {
       .select('DISTINCT post.id')
       .getRawMany();
 
+    if (!likedAndCommentedPosts.length) {
+      return { message: 'Posts not found' };
+    }
     const ids = likedAndCommentedPosts.map((post) => post.id);
 
     const postInfo: PostEntity[] = await this.getPostInfo(ids, undefined);

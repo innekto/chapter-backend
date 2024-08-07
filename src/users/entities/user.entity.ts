@@ -141,7 +141,9 @@ export class User extends EntityHelper {
   @OneToMany(() => PostEntity, (post) => post.author, { onDelete: 'CASCADE' })
   posts: PostEntity[];
 
-  @OneToMany(() => Book, (book) => book.user, { onDelete: 'CASCADE' })
+  @OneToMany(() => Book, (book) => book.user, {
+    onDelete: 'CASCADE',
+  })
   books: Book[];
 
   @OneToMany(() => CommentEntity, (comment) => comment.user, {

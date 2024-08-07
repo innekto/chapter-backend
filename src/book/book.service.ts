@@ -83,8 +83,9 @@ export class BookService {
     const user = await this.usersRepository.findOneOrFail({
       where: { id: userId },
     });
-
+    console.log('user :>> ', user);
     const book = this.bookRepository.create(createBookDto);
+    console.log('book :>> ', book);
     book.user = user;
 
     return await this.bookRepository.save(book);
