@@ -35,7 +35,7 @@ export class StatusSeedService {
   async setBookStatus() {
     const count = await this.bookStatusRepository.count();
 
-    if (count === 0) {
+    if (!count) {
       const promises = bookStatus.map(async (bs) => {
         const status = new BookStatus();
         status.name = bs;
